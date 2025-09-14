@@ -44,8 +44,8 @@ except Exception as e:
 
 def parse_event_with_openai(text: str) -> dict:
     """
-    Usa ChatGPT per estrarre nome evento, data, ora inizio/fine, descrizione
-    Restituisce dizionario con campi: event_name, event_date, start_time, end_time, description
+    Usa ChatGPT per estrarre nome evento, data, ora inizio/fine, descrizione e colore
+    Restituisce dizionario con campi: event_name, event_date, start_time, end_time, description, colorId
     """
     # Ottieni data e ora correnti
     now = datetime.now()
@@ -64,8 +64,25 @@ Estrai JSON evento:
   "event_date": "YYYY-MM-DD",
   "start_time": "HH:MM",
   "end_time": "HH:MM",
-  "description": ""
+  "description": "",
+  "colorId": ""
 }}
+
+COLORI GOOGLE CALENDAR DISPONIBILI:
+1: Lavender (Lavanda)
+2: Sage (Salvia/Verde chiaro)
+3: Grape (Uva/Viola)
+4: Flamingo (Rosa)
+5: Banana (Giallo)
+6: Tangerine (Arancione)
+7: Peacock (Turchese/Azzurro)
+8: Graphite (Grigio)
+9: Blueberry (Blu)
+10: Basil (Verde scuro)
+11: Tomato (Rosso)
+
+Se l'utente specifica un colore, scegli il colorId più simile tra quelli disponibili.
+Esempio: "rosso" -> colorId: "11", "blu" -> colorId: "9", "rosa" -> colorId: "4"
 
 "oggi"={current_date}, "domani"={tomorrow}, "stasera"=oggi sera
 Testo: "{text}"""
@@ -191,6 +208,11 @@ def whatsapp_reply():
             "end": {"dateTime": end_dt.isoformat(), "timeZone": "Europe/Rome"},
         }
 
+        # Aggiungi colore se specificato
+        if event_data.get("colorId"):
+            event_body["colorId"] = event_data["colorId"]
+            logging.info(f"🎨 Color ID set: {event_data['colorId']}")
+
         logging.info(f"🔍 Event body created: {event_body}")
 
         # Check timeout before calendar operation
@@ -228,7 +250,18 @@ def whatsapp_reply():
         formatted_date = start_dt.strftime("%d/%m/%Y alle %H:%M")
         formatted_end = end_dt.strftime("%H:%M")
 
-        response_text = f"✅ Evento '{event_data['event_name']}' creato!\n📅 {formatted_date} - {formatted_end}\n🔗 ID: {result.get('id', 'N/A')[:8]}..."
+        # Aggiungi info colore nella risposta se presente
+        color_info = ""
+        if event_data.get("colorId"):
+            color_names = {
+                '1': 'Lavanda', '2': 'Salvia', '3': 'Viola', '4': 'Rosa',
+                '5': 'Giallo', '6': 'Arancione', '7': 'Turchese', '8': 'Grigio',
+                '9': 'Blu', '10': 'Verde', '11': 'Rosso'
+            }
+            color_name = color_names.get(event_data['colorId'], 'Personalizzato')
+            color_info = f"\n🎨 Colore: {color_name}"
+
+        response_text = f"✅ Evento '{event_data['event_name']}' creato!\n📅 {formatted_date} - {formatted_end}{color_info}\n🔗 ID: {result.get('id', 'N/A')[:8]}..."
         logging.info(f"📤 Sending response: {response_text}")
         msg.body(response_text)
 
