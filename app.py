@@ -64,7 +64,7 @@ Estrai JSON evento:
   "event_date": "YYYY-MM-DD",
   "start_time": "HH:MM",
   "end_time": "HH:MM",
-  "description": "",
+  "description": "(opzionale: dettagli aggiuntivi sull'evento)",
   "colorId": ""
 }}
 
@@ -83,6 +83,9 @@ COLORI GOOGLE CALENDAR DISPONIBILI:
 
 Se l'utente specifica un colore, scegli il colorId più simile tra quelli disponibili.
 Esempio: "rosso" -> colorId: "11", "blu" -> colorId: "9", "rosa" -> colorId: "4"
+
+Se l'utente fornisce dettagli aggiuntivi sull'evento (luogo, partecipanti, note), includili nella description.
+Esempio: "cena con Marco al ristorante Rossi" -> description: "Luogo: ristorante Rossi"
 
 "oggi"={current_date}, "domani"={tomorrow}, "stasera"=oggi sera
 Testo: "{text}"""
@@ -201,17 +204,26 @@ def whatsapp_reply():
             msg.body(f"❌ Errore nel formato data/ora: {date_error}")
             return str(resp)
 
+        # Prepare event description
+        description = event_data.get("description", "").strip()
+        if not description:
+            description = "Evento creato tramite WhatsApp"
+
         event_body = {
             "summary": event_data["event_name"],
-            "description": event_data.get("description") or f"Creato tramite WhatsApp: {incoming_msg}",
+            "description": description,
             "start": {"dateTime": start_dt.isoformat(), "timeZone": "Europe/Rome"},
             "end": {"dateTime": end_dt.isoformat(), "timeZone": "Europe/Rome"},
         }
 
-        # Aggiungi colore se specificato
+        # Aggiungi colore: usa quello specificato o azzurro come default
         if event_data.get("colorId"):
             event_body["colorId"] = event_data["colorId"]
             logging.info(f"🎨 Color ID set: {event_data['colorId']}")
+        else:
+            # Default: azzurro/turchese (colorId 7)
+            event_body["colorId"] = "7"
+            logging.info(f"🎨 Default color set: 7 (Azzurro/Turchese)")
 
         logging.info(f"🔍 Event body created: {event_body}")
 
@@ -250,18 +262,23 @@ def whatsapp_reply():
         formatted_date = start_dt.strftime("%d/%m/%Y alle %H:%M")
         formatted_end = end_dt.strftime("%H:%M")
 
-        # Aggiungi info colore nella risposta se presente
-        color_info = ""
-        if event_data.get("colorId"):
-            color_names = {
-                '1': 'Lavanda', '2': 'Salvia', '3': 'Viola', '4': 'Rosa',
-                '5': 'Giallo', '6': 'Arancione', '7': 'Turchese', '8': 'Grigio',
-                '9': 'Blu', '10': 'Verde', '11': 'Rosso'
-            }
-            color_name = color_names.get(event_data['colorId'], 'Personalizzato')
-            color_info = f"\n🎨 Colore: {color_name}"
+        # Aggiungi info colore nella risposta
+        color_names = {
+            '1': 'Lavanda', '2': 'Salvia', '3': 'Viola', '4': 'Rosa',
+            '5': 'Giallo', '6': 'Arancione', '7': 'Turchese', '8': 'Grigio',
+            '9': 'Blu', '10': 'Verde', '11': 'Rosso'
+        }
+        # Usa il colore specificato o il default (7 - Turchese)
+        color_id = event_data.get("colorId", "7")
+        color_name = color_names.get(color_id, 'Turchese')
+        color_info = f"\n🎨 Colore: {color_name}"
 
-        response_text = f"✅ Evento '{event_data['event_name']}' creato!\n📅 {formatted_date} - {formatted_end}{color_info}\n🔗 ID: {result.get('id', 'N/A')[:8]}..."
+        # Build response without ID
+        response_text = f"✅ Evento '{event_data['event_name']}' creato!\n📅 {formatted_date} - {formatted_end}{color_info}"
+
+        # Add description if present
+        if description and description != "Evento creato tramite WhatsApp":
+            response_text += f"\n📝 {description}"
         logging.info(f"📤 Sending response: {response_text}")
         msg.body(response_text)
 
